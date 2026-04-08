@@ -1,0 +1,202 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <meta name="description" content="Codeforces 题目查询工具 - 快速查找CF题目信息、题解和代码">
+    <title>Codeforces 查题助手 | CF题目搜索</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- 加载动画 -->
+    <div class="loader-wrapper" id="loaderWrapper">
+        <div class="loader"></div>
+        <p>加载中...</p>
+    </div>
+
+    <!-- 主容器 -->
+    <div class="container">
+        <!-- 头部 -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fab fa-codeforces"></i>
+                    <h1>Codeforces <span>查题助手</span></h1>
+                </div>
+                <div class="theme-toggle">
+                    <i class="fas fa-moon"></i>
+                </div>
+            </div>
+            <p class="subtitle">快速查找 Codeforces 题目信息、题解和参考代码</p>
+        </header>
+
+        <!-- 搜索区域 -->
+        <div class="search-section">
+            <div class="search-card">
+                <div class="search-input-wrapper">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="searchInput" placeholder="输入题目ID或URL (例如: 1850A 或 https://codeforces.com/problemset/problem/1850/A)" autocomplete="off">
+                    <button id="searchBtn" class="search-btn">
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                </div>
+                <div class="search-examples">
+                    <span>试试:</span>
+                    <button class="example-btn" data-id="1850A">1850A</button>
+                    <button class="example-btn" data-id="4A">4A</button>
+                    <button class="example-btn" data-id="1730B">1730B</button>
+                    <button class="example-btn" data-id="1791C">1791C</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 错误提示 -->
+        <div class="error-message" id="errorMessage" style="display: none;">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span id="errorText"></span>
+        </div>
+
+        <!-- 题目信息区域 -->
+        <div class="problem-section" id="problemSection" style="display: none;">
+            <!-- 题目头部 -->
+            <div class="problem-header">
+                <div class="problem-id" id="problemId"></div>
+                <h2 class="problem-title" id="problemTitle"></h2>
+                <div class="problem-meta">
+                    <span class="meta-item" id="problemRating">
+                        <i class="fas fa-chart-line"></i>
+                        <span>难度: --</span>
+                    </span>
+                    <span class="meta-item" id="problemTags">
+                        <i class="fas fa-tags"></i>
+                        <span>标签: --</span>
+                    </span>
+                    <span class="meta-item" id="problemSolved">
+                        <i class="fas fa-users"></i>
+                        <span>通过数: --</span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- 标签页导航 -->
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="description">
+                    <i class="fas fa-file-alt"></i> 题目描述
+                </button>
+                <button class="tab-btn" data-tab="solution">
+                    <i class="fas fa-code"></i> 题解思路
+                </button>
+                <button class="tab-btn" data-tab="code">
+                    <i class="fas fa-laptop-code"></i> 参考代码
+                </button>
+                <button class="tab-btn" data-tab="similar">
+                    <i class="fas fa-list"></i> 相似题目
+                </button>
+            </div>
+
+            <!-- 题目描述内容 -->
+            <div class="tab-content active" id="descriptionTab">
+                <div class="problem-description">
+                    <div class="description-card">
+                        <h3><i class="fas fa-align-left"></i> 题目描述</h3>
+                        <div id="problemStatement" class="statement-content">
+                            <div class="loading-skeleton"></div>
+                        </div>
+                    </div>
+                    <div class="io-card">
+                        <div class="input-spec">
+                            <h4><i class="fas fa-sign-in-alt"></i> 输入格式</h4>
+                            <div id="inputSpec" class="spec-content"></div>
+                        </div>
+                        <div class="output-spec">
+                            <h4><i class="fas fa-sign-out-alt"></i> 输出格式</h4>
+                            <div id="outputSpec" class="spec-content"></div>
+                        </div>
+                    </div>
+                    <div class="examples-card">
+                        <h3><i class="fas fa-code-branch"></i> 示例</h3>
+                        <div id="examples" class="examples-content"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 题解思路内容 -->
+            <div class="tab-content" id="solutionTab">
+                <div class="solution-content">
+                    <div class="solution-card">
+                        <h3><i class="fas fa-lightbulb"></i> 解题思路</h3>
+                        <div id="solutionText" class="solution-text">
+                            <div class="loading-skeleton"></div>
+                        </div>
+                    </div>
+                    <div class="complexity-card">
+                        <h3><i class="fas fa-chart-bar"></i> 复杂度分析</h3>
+                        <div id="complexity" class="complexity-content"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 代码内容 -->
+            <div class="tab-content" id="codeTab">
+                <div class="code-container">
+                    <div class="code-header">
+                        <div class="language-selector">
+                            <button class="lang-btn active" data-lang="cpp">
+                                <i class="fab fa-cplusplus"></i> C++
+                            </button>
+                            <button class="lang-btn" data-lang="python">
+                                <i class="fab fa-python"></i> Python
+                            </button>
+                            <button class="lang-btn" data-lang="java">
+                                <i class="fab fa-java"></i> Java
+                            </button>
+                        </div>
+                        <button class="copy-btn" id="copyCodeBtn">
+                            <i class="fas fa-copy"></i> 复制代码
+                        </button>
+                    </div>
+                    <div class="code-wrapper">
+                        <pre><code id="codeContent" class="language-cpp">// 点击加载代码...</code></pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 相似题目内容 -->
+            <div class="tab-content" id="similarTab">
+                <div class="similar-container">
+                    <h3><i class="fas fa-link"></i> 相似题目推荐</h3>
+                    <div id="similarProblems" class="similar-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 最近搜索记录 -->
+        <div class="history-section" id="historySection">
+            <div class="history-header">
+                <h3><i class="fas fa-history"></i> 最近搜索</h3>
+                <button id="clearHistoryBtn" class="clear-btn">
+                    <i class="fas fa-trash-alt"></i> 清空
+                </button>
+            </div>
+            <div id="historyList" class="history-list"></div>
+        </div>
+
+        <!-- 页脚 -->
+        <footer class="footer">
+            <p>数据来源: <a href="https://codeforces.com/api" target="_blank">Codeforces API</a></p>
+            <p>© 2024 Codeforces 查题助手 | 仅供学习交流使用</p>
+        </footer>
+    </div>
+
+    <!-- 提示消息 -->
+    <div class="toast-message" id="toastMessage">
+        <span id="toastText"></span>
+    </div>
+
+    <script src="js/main.js"></script>
+</body>
+</html>

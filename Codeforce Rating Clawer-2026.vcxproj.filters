@@ -1,0 +1,53 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="资源文件">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="www">
+      <UniqueIdentifier>{87601e1d-14a9-4d3e-b004-9b84c8b153b9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="http">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="http\头文件">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="www\css">
+      <UniqueIdentifier>{0b152347-719e-4b25-8f27-2c622bdae4ed}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="www\js">
+      <UniqueIdentifier>{66409acd-ced6-4c7a-891d-f92713142080}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp">
+      <Filter>http</Filter>
+    </ClCompile>
+    <ClCompile Include="HTTP.cpp">
+      <Filter>http</Filter>
+    </ClCompile>
+    <ClCompile Include="HTTP.h">
+      <Filter>http\头文件</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="config.h">
+      <Filter>http\头文件</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="www\index.html">
+      <Filter>www</Filter>
+    </None>
+    <None Include="www\css\style.css">
+      <Filter>www\css</Filter>
+    </None>
+    <None Include="www\js\main.js">
+      <Filter>www\js</Filter>
+    </None>
+  </ItemGroup>
+</Project>

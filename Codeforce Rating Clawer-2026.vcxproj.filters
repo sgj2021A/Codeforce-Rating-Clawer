@@ -33,9 +33,15 @@
     <ClCompile Include="HTTP.h">
       <Filter>http\头文件</Filter>
     </ClCompile>
+    <ClCompile Include="HTTPSCLENT.cpp">
+      <Filter>http</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="config.h">
+      <Filter>http\头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="HTTPSCLIENT.h">
       <Filter>http\头文件</Filter>
     </ClInclude>
   </ItemGroup>

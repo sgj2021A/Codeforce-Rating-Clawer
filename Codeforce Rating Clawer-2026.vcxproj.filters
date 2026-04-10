@@ -57,7 +57,7 @@
     <None Include="www\css\style.css">
       <Filter>www\css</Filter>
     </None>
-    <None Include="www\js\main.js">
+    <None Include="www\js\script.js">
       <Filter>www\js</Filter>
     </None>
   </ItemGroup>

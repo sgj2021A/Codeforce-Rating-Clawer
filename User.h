@@ -26,10 +26,6 @@ enum USERSTATE {
 					     
 	USER_ADDUSER_ABLE,   // add user able
 	USER_ADDUSER_EXIST,  // user exitst 
-					     
-	USER_SETINDEX_ABLE,  // set index user able
-	USER_SETINDEX_ENABLE,// set index user unable
-	USER_SETINDEX_REPEAT // set index user repeat
 };
 
 // class
@@ -37,10 +33,8 @@ enum USERSTATE {
 class user {
 private:
 	// 
-	std::string userIndex;
 	std::set<std::string> userName; 
 	std::string path;
-
 	// funcation
 
 public:
@@ -50,8 +44,8 @@ public:
 	user();
 	~user();
 	USERSTATE find_user(std::string &findName);
-	USERSTATE add_user(std::string& addName);
-	USERSTATE set_indexuser(std::string& indexUserName);
+	USERSTATE add_user(const std::string& addName);
+	std::string user_JSON(void);
 };
 
 #endif // !__USER_H

@@ -130,14 +130,18 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="cJSON\cJSON.c" />
     <ClCompile Include="HTTP.cpp" />
     <ClCompile Include="HTTP.h" />
     <ClCompile Include="HTTPSCLENT.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="User.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="cJSON\cJSON.h" />
     <ClInclude Include="config.h" />
     <ClInclude Include="HTTPSCLIENT.h" />
+    <ClInclude Include="User.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="www\css\style.css" />

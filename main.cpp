@@ -12,19 +12,41 @@
 //	return 0;
 //}
 
-#include "HTTPSCLIENT.h"
-#include "HTTP.h"
+//#include "HTTPSCLIENT.h"
+//#include "HTTP.h"
+//#include <iostream>
+//#include <windows.h>
+//
+//
+//int main() {
+//	SetConsoleOutputCP(CP_UTF8);
+//	SetConsoleCP(CP_UTF8);
+//
+//	HTTPSCLIENT https;
+//	std::string response = https >> "https://codeforces.com/api/user.info?handles=hoO_Ooh&checkHistoricHandles=false";
+//	std::cout << response << std::endl;
+//
+//	return 0;
+//}
+
+#include "User.h"
 #include <iostream>
 #include <windows.h>
-
+#include "cJSON/cJSON.h"
+#include <fstream>
 
 int main() {
 	SetConsoleOutputCP(CP_UTF8);
 	SetConsoleCP(CP_UTF8);
 
-	HTTPSCLIENT https;
-	std::string response = https >> "https://codeforces.com/api/user.info?handles=hoO_Ooh&checkHistoricHandles=false";
-	std::cout << response << std::endl;
-
+	user u;
+	std::string name = "hoO_Ooh";
+	if (u.add_user(name) == USER_ADDUSER_EXIST) {
+		std::cout << "EXIST\n";
+	}
+	
+	if (u.set_indexuser(name) != USER_SETINDEX_ABLE) {
+		std::cout << "NO\n";
+	}
 	return 0;
 }

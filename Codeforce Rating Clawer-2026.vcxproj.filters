@@ -49,6 +49,9 @@
       <Filter>CJSON</Filter>
     </ClInclude>
     <ClInclude Include="User.h" />
+    <ClInclude Include="resource.h">
+      <Filter>http\头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="www\index.html">
@@ -60,5 +63,14 @@
     <None Include="www\js\script.js">
       <Filter>www\js</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="user\user.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Codeforce Rating Clawer-2026.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="favicon.ico" />
   </ItemGroup>
 </Project>

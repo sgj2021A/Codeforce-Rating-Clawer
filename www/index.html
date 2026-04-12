@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes, viewport-fit=cover">
-    <title>CF 团队 · 全能工作台</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.ico">	
+    <title>Codeforce Rating Clawer</title>
     <!-- 字体与图标 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,7 +17,7 @@
 <body>
     <div class="app-wrapper">
         <header class="app-header">
-            <h1><i class="fas fa-users-between-lines"></i> Codeforces 团队·后续赛·题板</h1>
+            <h1><i class="fas fa-users-between-lines"></i>Codeforce Rating Clawer</h1>
             <p class="subtitle">队友 · 曲线 · 补题</p>
         </header>
 
@@ -25,7 +26,7 @@
             <aside class="team-sidebar">
                 <div class="sidebar-header">
                     <span><i class="fas fa-user-group"></i> 团队成员</span>
-                    <span class="badge" id="member-count">3</span>
+                    <span class="badge" id="member-count">0</span>
                     <button class="refresh-btn" id="refreshBtn" title="刷新数据"><i class="fas fa-sync-alt"></i></button>
                 </div>
                 <!-- 添加成员按钮 -->
@@ -38,14 +39,12 @@
                         <i class="fas fa-calendar-alt"></i> 即将到来的比赛
                     </div>
                     <div class="upcoming-list" id="upcomingContestsList">
-                        <div class="upcoming-item">📅 CF Round #950 · 2天后</div>
-                        <div class="upcoming-item">📅 Educational Round 162 · 5天后</div>
                     </div>
                 </div>
 
                 <div class="api-note">
                     <i class="fas fa-code"></i>
-                    <span>🔗 API预留: user.info · 增删本地模拟</span>
+                    <span>又是美好的一天</span>
                 </div>
             </aside>
 
@@ -57,19 +56,9 @@
                 <!-- Rating 曲线卡片 -->
                 <section class="section-card card">
                     <div class="section-title"><i class="fas fa-chart-line"></i> Rating 变化曲线</div>
-                    <div class="chart-container" id="rating-curve-chart" style="height:200px;"></div>
-                    <div class="api-note inline-note">📈 基于比赛记录模拟，可接入 user.rating</div>
+                    <div class="chart-container" id="rating-curve-chart" style="height:300px;"></div>
                 </section>
-
-                <!-- 比赛记录表格 -->
-                <section class="section-card card">
-                    <div class="section-title">
-                        <i class="fas fa-trophy"></i> 比赛记录 · 近→远
-                        <span class="hint">(点击题目可查看题板)</span>
-                    </div>
-                    <div class="table-responsive" id="contests-table-wrapper"></div>
-                </section>
-
+                
                 <!-- 难度直方图 -->
                 <section class="section-card card">
                     <div class="section-title"><i class="fas fa-chart-bar"></i> 通过题目难度分布</div>
@@ -81,7 +70,7 @@
                             <button class="filter-btn" data-range="month">近1个月</button>
                         </div>
                     </div>
-                    <div class="chart-container" id="rating-histogram-chart"></div>
+                    <div class="chart-container" id="rating-histogram-chart" style="height:250px;"></div>
                 </section>
 
                 <!-- 三栏：题目列表（支持点击打开题板） -->
@@ -100,7 +89,15 @@
                     </div>
                 </div>
 
-                <div class="api-watermark">✨ 标注：所有数据请求均预留CF API接口，当前为模拟展示。</div>
+                <!-- 比赛记录表格 -->
+                <section class="section-card card">
+                    <div class="section-title">
+                        <i class="fas fa-trophy"></i> 比赛记录 · 近→远
+                        <span class="hint">(点击题目可查看链接)</span>
+                    </div>
+                    <div class="table-responsive" id="contests-table-wrapper"></div>
+                </section>
+
             </main>
         </div>
     </div>
@@ -135,7 +132,7 @@
             <div class="modal-body">
                 <label>Codeforces Handle</label>
                 <input type="text" id="newMemberHandle" class="modal-input" placeholder="例如: tourist">
-                <p class="hint">输入后将自动获取用户信息 (模拟)</p>
+                <p class="hint">输入后将自动获取用户信息</p>
             </div>
             <div class="modal-footer">
                 <button class="modal-action" id="confirmAddMemberBtn">添加</button>

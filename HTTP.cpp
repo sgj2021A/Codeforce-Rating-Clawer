@@ -26,7 +26,6 @@ HTTP::HTTP() {
 		err = WSAGetLastError();
 		throw std::runtime_error("Socket listen failed ! error numble : " + std::to_string(err));
 	}
-	std::cout << "HTTP Server started on http://" << HTTP_SERVERADDR << ":" << HTTP_PORT << std::endl;
 }
 
 // 结束函数
@@ -39,77 +38,109 @@ HTTP::~HTTP() {
 
 // 接收函数 返回头HTTPHeader
 HTTPHeaders HTTP::reserve() {
-	std::string content;
-	HTTPHeaders res;
-	SOCKET client = accept(server, nullptr, nullptr);
-	std::cout << "New Link\n";
-	while (1) {
-		int r = recv(client, buff, HTTP_BUFFSIZE_MAX - 1, 0);
-		if (r <= 0) break; 
-		buff[r] = '\0';    
-		content += buff;
-		if (content.find("\r\n\r\n") != std::string::npos) {
-			break;
-		}
-	}
+    std::string content;
+    HTTPHeaders res;
+    SOCKET client = accept(server, nullptr, nullptr);
+    //std::cout << "New Link\n";
 
-	std::istringstream stream(content);
-	std::string line;
-	if (std::getline(stream, line) && !line.empty()) {
-		if (!line.empty() && line.back() == '\r') {
-			line.pop_back();
-		}
-		std::istringstream request_line(line);
-		request_line >> res.method >> res.path >> res.version;
-	}
+    // 第一步：读取头部
+    while (1) {
+        int r = recv(client, buff, HTTP_BUFFSIZE_MAX - 1, 0);
+        if (r <= 0) break;
+        buff[r] = '\0';
+        content += buff;
+        if (content.find("\r\n\r\n") != std::string::npos) {
+            break;
+        }
+    }
 
-	while (std::getline(stream, line) && !line.empty()) {
-		if (!line.empty() && line.back() == '\r') {
-			line.pop_back();
-		}
-		size_t colon_pos = line.find(':');
-		if (colon_pos != std::string::npos) {
-			std::string key = line.substr(0, colon_pos);
-			std::string value = line.substr(colon_pos + 1);
-			size_t start = value.find_first_not_of(" \t");
-			if (start != std::string::npos) {
-				value = value.substr(start);
-			}
+    //std::cout << "=== Headers ===" << std::endl;
+    //std::cout << content << std::endl;
 
-			res.headers[key] = value;
-		}
-	}
+    // 解析头部
+    std::istringstream stream(content);
+    std::string line;
+    if (std::getline(stream, line) && !line.empty()) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        std::istringstream request_line(line);
+        request_line >> res.method >> res.path >> res.version;
+    }
 
-	std::string body_content;
-	std::string remaining;
-	while (std::getline(stream, remaining)) {
-		if (!body_content.empty()) {
-			body_content += "\n";
-		}
-		body_content += remaining;
-	}
-	res.body = body_content;
-	
-	// 调用部分
-	std::string funcName = res.path;
-	if (!funcName.empty() && funcName[0] == '/') {
-		funcName = funcName.substr(1);
-	}
+    // 解析其他头部
+    int content_length = 0;
+    while (std::getline(stream, line) && !line.empty()) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        size_t colon_pos = line.find(':');
+        if (colon_pos != std::string::npos) {
+            std::string key = line.substr(0, colon_pos);
+            std::string value = line.substr(colon_pos + 1);
+            size_t start = value.find_first_not_of(" \t");
+            if (start != std::string::npos) {
+                value = value.substr(start);
+            }
+            res.headers[key] = value;
 
-	// 调用函数部分 (调用函数要求 /函数名称 )
-	auto func = funcations.find(funcName);
-	if (func != funcations.end()) {
-		std::string funcResult = func->second(res.body);
-		send(client, funcResult.c_str(), funcResult.length(), 0);
-		return res;
-	}
+            // 获取 Content-Length
+            if (key == "Content-Length" || key == "content-length") {
+                content_length = std::stoi(value);
+            }
+        }
+    }
 
-	// 获取静态资源
-	std::string resource = handleGetRequest(res);
-	send(client, resource.c_str(), resource.length(), 0);
+    //读取 body
+    std::string body_content;
+    if (content_length > 0) {
+        size_t header_end = content.find("\r\n\r\n");
+        size_t body_already_read = content.length() - (header_end + 4);
 
-	closesocket(client);
-	return res;
+        if (body_already_read < content_length) {
+            int remaining = content_length - body_already_read;
+            while (remaining > 0) {
+                int r = recv(client, buff, (std::min)(remaining, HTTP_BUFFSIZE_MAX - 1), 0);
+                if (r <= 0) break;
+                buff[r] = '\0';
+                body_content += buff;
+                remaining -= r;
+            }
+        }
+        else {
+            body_content = content.substr(header_end + 4);
+        }
+
+        res.body = body_content;
+        //std::cout << "=== Body ===" << std::endl;
+        //std::cout << body_content << std::endl;
+    }
+    else {
+        res.body = "";
+    }
+
+    // 处理请求
+    std::string funcName = res.path;
+    if (!funcName.empty() && funcName[0] == '/') {
+        funcName = funcName.substr(1);
+    }
+
+    std::string response;
+    auto func = funcations.find(funcName);
+    if (func != funcations.end()) {
+        // 对于 POST 请求，传入 body
+        if (res.method == "POST") {
+            response = func->second(res.body);
+        }
+        else {
+            response = func->second("");
+        }
+    }
+    else {
+        // 静态资源
+        response = handleGetRequest(res);
+    }
+
+    send(client, response.c_str(), response.length(), 0);
+    closesocket(client);
+
+    return res;
 }
 
 // 注册函数

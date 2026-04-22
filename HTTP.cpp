@@ -1,5 +1,6 @@
 #include "HTTP.h"
 
+
 // 初始化函数
 HTTP::HTTP() {
 	int err;
@@ -28,6 +29,24 @@ HTTP::HTTP() {
 	}
 }
 
+/*
+ * 函数 : getFileSize
+ * 类   : HTTP
+ * 作用 : 返回文件大小
+ * 输入 : const std::string &path 文件路径
+ * 返回 : unsigned long long 文件大小(字节)
+ */
+unsigned long long HTTP::getFileSize(const std::string& path) {
+    try {
+        return std::filesystem::file_size(path);
+    }
+    catch (const std::filesystem::filesystem_error& e) {
+        std::string error_msg = "get file size error for path: " + e.path1().string() + " - " + e.what();
+        throw std::runtime_error(error_msg);
+        return HTTP_SLLONG_MAX;
+    }
+}
+
 // 结束函数
 HTTP::~HTTP() {
 	if (server != INVALID_SOCKET) {
@@ -40,10 +59,15 @@ HTTP::~HTTP() {
 HTTPHeaders HTTP::reserve() {
     std::string content;
     HTTPHeaders res;
-    SOCKET client = accept(server, nullptr, nullptr);
-    //std::cout << "New Link\n";
+    sockaddr_in clientAddr;
+    int clientAddrLen = sizeof(clientAddr);
 
-    // 第一步：读取头部
+    SOCKET client = accept(server, (sockaddr*)&clientAddr, &clientAddrLen);
+
+    char clientIp[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &clientAddr.sin_addr, clientIp, INET_ADDRSTRLEN);
+
+    // 读取头部
     while (1) {
         int r = recv(client, buff, HTTP_BUFFSIZE_MAX - 1, 0);
         if (r <= 0) break;
@@ -87,7 +111,7 @@ HTTPHeaders HTTP::reserve() {
         }
     }
 
-    //读取 body
+    // 读取 body
     std::string body_content;
     if (content_length > 0) {
         size_t header_end = content.find("\r\n\r\n");
@@ -131,14 +155,17 @@ HTTPHeaders HTTP::reserve() {
         else {
             response = func->second("");
         }
+        send(client, response.c_str(), response.length(), 0);
+        closesocket(client);
     }
     else {
-        // 静态资源
-        response = handleGetRequest(res);
-    }
+        // 静态资源 (直接发送即可)
+        bool ok = handleGetRequest(res, client);
 
-    send(client, response.c_str(), response.length(), 0);
-    closesocket(client);
+        // 测试代码
+        if(ok)std::cout << std::string(clientIp) << " "<< "response:" << res.path << " " << "status:ok" << std::endl;
+        else std::cout << std::string(clientIp) << " " << "response:" << res.path << " " << "status:fail" << std::endl;
+    }
 
     return res;
 }
@@ -148,28 +175,42 @@ void HTTP::registerFuncation(const std::string& name, FuncationType func) {
 	funcations[name] = func;
 }
 
-// 获取静态资源
-std::string HTTP::handleGetRequest(const HTTPHeaders& header) {
-	//默认文件
-	std::string path = header.path;
+/*
+ * 函数 : handleGetRequest
+ * 类   : HTTP
+ * 作用 : 获取静态资源
+ * 输入 : const HTTPHeaders& header   表头
+ *        SOCKET& client               客户端socket
+ * 返回 : bool                        返回状态 true 成功 false 失败
+ * 备注 : 默认文件路径                HTTP_DEFAULT_FILE
+ *        选择文件夹路径              HTTP_PATH
+ *        相对路径使用                ./为开头，绝对路径无视,如果为空默认.exe文件路径
+ */
+bool HTTP::handleGetRequest(const HTTPHeaders& header, SOCKET& client) {
+    // 是否成功构建
+    bool ok = true;
 
+	// 构建文件路径
+    std::string path = header.path;
 	if (path == "/") {
-		path = "/index.html";
+		path = HTTP_DEFAULT_FILE;
 	}
-
-	std::string basePath = ".";
-	if (!std::string(HTTP_PATH).empty())basePath = basePath + "/" + HTTP_PATH;
-	std::string filename = basePath + path;  // 在HTTP_PATH下
+    std::string basePath = std::string(HTTP_PATH);
+	if (basePath.empty())basePath = "./";
+	std::string filename = basePath + path;  
 
 	std::ifstream file(filename, std::ios::binary);
 	if (!file.is_open()) {
 		return "HTTP/1.1 404 Not Found\r\n\r\nFile not found";
+        ok = false;
 	}
 
+    // 查询文件大小
+    unsigned long long fileSize = HTTP::getFileSize(filename);
+    if (fileSize == HTTP_SLLONG_MAX)ok = false;
 	std::stringstream buffer;
-	buffer << file.rdbuf();
-	std::string content = buffer.str();
-
+    
+    // 响应添加类型
 	auto getContentType = [](const std::string& path)->std::string {
 		if (path.find(".html") != std::string::npos) return "text/html";
 		if (path.find(".css") != std::string::npos) return "text/css";
@@ -180,13 +221,24 @@ std::string HTTP::handleGetRequest(const HTTPHeaders& header) {
 		return "text/plain";
 	};
 
-	// 7. 返回响应
-	std::string response =
-		"HTTP/1.1 200 OK\r\n"
-		"Content-Length: " + std::to_string(content.size()) + "\r\n"
-		"Content-Type: " + getContentType(path) + "\r\n"
-		"\r\n" +
-		content;
+	// 返回响应头
+    std::string response =
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Length: " + std::to_string(fileSize) + "\r\n"
+        "Content-Type: " + getContentType(path) + "\r\n"
+        "\r\n";
 
-	return response;
+    send(client, response.c_str(), response.length(), 0);
+
+    // 返回主体内容
+    while (file.read(buffStatic, HTTP_BUFFSIZE_MAX) || file.gcount() > 0) {
+        if (send(client, buffStatic, file.gcount(), 0) == SOCKET_ERROR) {
+            ok = false;
+            break;
+        }
+    }
+
+    closesocket(client);
+
+    return ok;
 }

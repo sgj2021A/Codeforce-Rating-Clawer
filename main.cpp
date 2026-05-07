@@ -4,108 +4,155 @@
 #include <iostream>
 #include <string>
 #include <functional>
+#include <cstdlib>
+#include <atomic>
+#include <chrono>
+#include <thread>
+#include <signal.h>
+
+#ifdef _WIN32
 #include <windows.h>
+#else
+#include <cstdlib>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <fstream>
+#endif
+
 HTTP http;
 HTTPSCLIENT https;
 user u;
 
-// /get
-std::function<std::string(const std::string&)> GetHttpsFuncation = [](const std::string& body) {
-	//std::cout << body << std::endl;
-	std::string content = https >> body;
-	std::string response =
-		"HTTP/1.1 200 OK\r\n"
-		"Content-Length: " + std::to_string(content.size()) + "\r\n"
-		"Content-Type: application/json\r\n"
-		"\r\n" +
-		content;
-	return response;
+// È«¾ÖÔËÐÐ±êÖ¾
+std::atomic<bool> running(true);
+
+// ÐÅºÅ´¦Àíº¯Êý
+void signalHandler(int signum) {
+    std::cout << "\nreceive the stopping sign (" << signum << "),stopping server..." << std::endl;
+    running = false;
+    http.stop();
+}
+
+// Â·ÓÉº¯Êý¶¨Òå
+std::function<std::string(const std::string&)> GetHttpsFunction = [](const std::string& body) {
+    std::string content = https >> body;
+    std::string response =
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Length: " + std::to_string(content.size()) + "\r\n"
+        "Content-Type: application/json\r\n"
+        "\r\n" +
+        content;
+    return response;
 };
 
-// /getUserList
-std::function<std::string(const std::string&)> GetLocalhostFuncation = [](const std::string& body) {
-	std::string content = u.user_JSON();
-	std::string response =
-		"HTTP/1.1 200 OK\r\n"
-		"Content-Length: " + std::to_string(content.size()) + "\r\n"
-		"Content-Type: application/json\r\n"
-		"\r\n" +
-		content;
-	return response;
+std::function<std::string(const std::string&)> GetLocalhostFunction = [](const std::string& body) {
+    std::string content = u.user_JSON();
+    std::string response =
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Length: " + std::to_string(content.size()) + "\r\n"
+        "Content-Type: application/json\r\n"
+        "\r\n" +
+        content;
+    return response;
 };
 
-// /addUser
-std::function<std::string(const std::string&)> AddUserFuncation = [](const std::string& body) {
-	if (u.add_user(body) != USER_ADDUSER_ABLE) {
-		std::string error_body = "{\"status\":\"error\",\"comment\":\"add user error\"}";
-		std::string response =
-			"HTTP/1.1 400 Bad Request\r\n"
-			"Content-Length: " + std::to_string(error_body.size()) + "\r\n"
-			"Content-Type: application/json\r\n"
-			"\r\n" +
-			error_body;
-		return response;
-	}
+std::function<std::string(const std::string&)> AddUserFunction = [](const std::string& body) {
+    if (u.add_user(body) != USER_ADDUSER_ABLE) {
+        std::string error_body = "{\"status\":\"error\",\"comment\":\"add user error\"}";
+        std::string response =
+            "HTTP/1.1 400 Bad Request\r\n"
+            "Content-Length: " + std::to_string(error_body.size()) + "\r\n"
+            "Content-Type: application/json\r\n"
+            "\r\n" +
+            error_body;
+        return response;
+    }
 
-	std::cout << "æ·»åŠ ç”¨æˆ·: " + body << std::endl;
+    std::cout << "Add user: " + body << std::endl;
+    std::string content = u.user_JSON();
+    std::string success_body = "{\"status\":\"ok\",\"users\":" + content + "}";
 
-	// æˆåŠŸæ—¶è¿”å›žç”¨æˆ·åˆ—è¡¨
-	std::string content = u.user_JSON();
-	std::string success_body = "{\"status\":\"ok\",\"users\":" + content + "}";
-
-	std::string response =
-		"HTTP/1.1 200 OK\r\n"
-		"Content-Length: " + std::to_string(success_body.size()) + "\r\n"
-		"Content-Type: application/json\r\n"
-		"\r\n" +
-		success_body;
-
-	return response;
+    std::string response =
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Length: " + std::to_string(success_body.size()) + "\r\n"
+        "Content-Type: application/json\r\n"
+        "\r\n" +
+        success_body;
+    return response;
 };
 
-// /deleteUser
-std::function<std::string(const std::string&)> DeleteUserFuncation = [](const std::string& body) {
-	if (u.delete_user(body) != USER_DELETEUSER_ABLE) {
-		std::string error_body = "{\"status\":\"error\",\"comment\":\"delete user error\"}";
-		std::string response =
-			"HTTP/1.1 400 Bad Request\r\n"
-			"Content-Length: " + std::to_string(error_body.size()) + "\r\n"
-			"Content-Type: application/json\r\n"
-			"\r\n" +
-			error_body;
-		return response;
-	}
+std::function<std::string(const std::string&)> DeleteUserFunction = [](const std::string& body) {
+    if (u.delete_user(body) != USER_DELETEUSER_ABLE) {
+        std::string error_body = "{\"status\":\"error\",\"comment\":\"delete user error\"}";
+        std::string response =
+            "HTTP/1.1 400 Bad Request\r\n"
+            "Content-Length: " + std::to_string(error_body.size()) + "\r\n"
+            "Content-Type: application/json\r\n"
+            "\r\n" +
+            error_body;
+        return response;
+    }
 
-	std::cout << "åˆ é™¤ç”¨æˆ·: " + body << std::endl;
+    std::cout << "Delete user: " + body << std::endl;
+    std::string content = u.user_JSON();
+    std::string success_body = "{\"status\":\"ok\",\"users\":" + content + "}";
 
-	// æˆåŠŸæ—¶è¿”å›žç”¨æˆ·åˆ—è¡¨
-	std::string content = u.user_JSON();
-	std::string success_body = "{\"status\":\"ok\",\"users\":" + content + "}";
-
-	std::string response =
-		"HTTP/1.1 200 OK\r\n"
-		"Content-Length: " + std::to_string(success_body.size()) + "\r\n"
-		"Content-Type: application/json\r\n"
-		"\r\n" +
-		success_body;
-
-	return response;
+    std::string response =
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Length: " + std::to_string(success_body.size()) + "\r\n"
+        "Content-Type: application/json\r\n"
+        "\r\n" +
+        success_body;
+    return response;
 };
 
+void openBrowser(const std::string& url) {
+#ifdef _WIN32
+    ShellExecuteA(NULL, "open", url.c_str(), NULL, NULL, SW_SHOWNORMAL);
+#elif defined(__APPLE__)
+    std::string command = "open " + url;
+    system(command.c_str());
+#else
+    // Linux: ´ò¿ªä¯ÀÀÆ÷
+    std::string command = "xdg-open \"" + url + "\" 2>/dev/null &";
+    system(command.c_str());
+#endif
+}
 
-int main() {
-	int err = 0;
-	SetConsoleOutputCP(CP_UTF8);
-	SetConsoleCP(CP_UTF8);
-	http.registerFuncation("get", GetHttpsFuncation);
-	http.registerFuncation("getUserList", GetLocalhostFuncation);
-	http.registerFuncation("addUser", AddUserFuncation);
-	http.registerFuncation("deleteUser", DeleteUserFuncation);
-	std::cout << "HTTPæœåŠ¡å™¨å·²ç»å¼€å¯åœ¨ http://" << HTTP_SERVERADDR << ":" << HTTP_PORT << std::endl;
-	std::cout << "ç³»ç»Ÿè¿è¡Œä¸­è¯·ä¸è¦å…³é—­çª—å£..." << std::endl;
-	system("start http://localhost:8080");
-	while (1) {
-		http.reserve();
-	}
-	return 0;
+void setConsoleEncoding() {
+#ifdef _WIN32
+    SetConsoleOutputCP(CP_UTF8);
+    SetConsoleCP(CP_UTF8);
+#endif
+}
+
+int main(int argc, char* argv[]) {
+    
+    // ×¢²áÐÅºÅ´¦Àí
+    signal(SIGINT, signalHandler);
+    signal(SIGTERM, signalHandler);
+
+    setConsoleEncoding();
+
+    http.registerFuncation("get", GetHttpsFunction);
+    http.registerFuncation("getUserList", GetLocalhostFunction);
+    http.registerFuncation("addUser", AddUserFunction);
+    http.registerFuncation("deleteUser", DeleteUserFunction);
+
+    std::cout << "========================================" << std::endl;
+    std::cout << "HTTP Server started at http://" << HTTP_SERVERADDR << ":" << HTTP_PORT << std::endl;
+    std::cout << "Server is running, please do not close this window..." << std::endl;
+    std::cout << "Press Ctrl+C (Linux) or close this window (Windows) to stop the server" << std::endl;
+    std::cout << "========================================" << std::endl;
+
+    std::string url = "http://localhost:" + std::to_string(HTTP_PORT);
+    openBrowser(url);
+
+    // Ö÷Ñ­»·
+    while (running && http.isRunning()) {
+        http.reserve(1);  // 1Ãë³¬Ê±
+    }
+    
+    std::cout << "http server has stopped" << std::endl;
+    return 0;
 }

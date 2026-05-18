@@ -118,6 +118,312 @@ class Person {
     }
 }
 
+// 比赛详情管理类
+class ContestDetailManager {
+    constructor() {
+        this.modalId = 'contest-detail-modal';
+        this.initStyles();
+    }
+    
+    initStyles() {
+        if (document.getElementById('contest-detail-styles')) return;
+        
+        const style = document.createElement('style');
+        style.id = 'contest-detail-styles';
+        style.textContent = `
+            .loading-spinner {
+                display: inline-block;
+                width: 40px; height: 40px;
+                border: 3px solid #f3f3f3;
+                border-top: 3px solid #3498db;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+            }
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+            .contest-card {
+                transition: transform 0.2s, box-shadow 0.2s;
+                cursor: pointer;
+            }
+            .contest-card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            }
+            .problem-vp {
+                background-color: #fff3cd;
+                border-left: 3px solid #ffc107;
+            }
+            .problem-unsolved {
+                background-color: #f8d7da;
+                border-left: 3px solid #dc3545;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/&/g, '&amp;')
+                  .replace(/</g, '&lt;')
+                  .replace(/>/g, '&gt;')
+                  .replace(/"/g, '&quot;')
+                  .replace(/'/g, '&#39;');
+    }
+    
+    async showContestDetails(contestId, contestName, username, contestDataFromRating, userSubmissions = []) {
+        this.showModal(`
+            <div style="text-align: center; padding: 40px;">
+                <div style="font-size: 18px; margin-bottom: 20px;">📊 加载比赛详情中...</div>
+                <div class="loading-spinner"></div>
+            </div>
+        `, contestName);
+        
+        try {
+            const response = await fetch(`https://codeforces.com/api/contest.standings?contestId=${contestId}`);
+            const data = await response.json();
+            
+            let apiProblems = null;
+            let userStanding = null;
+            let hasRow = false;
+            
+            if (data.status === 'OK') {
+                apiProblems = data.result.problems || null;
+                if (data.result.rows && data.result.rows.length > 0) {
+                    userStanding = data.result.rows.find(row => 
+                        row.party.members.some(m => m.handle === username)
+                    );
+                    hasRow = !!userStanding;
+                }
+            }
+            
+            this.renderContestDetailsModal(
+                contestName, contestId,
+                apiProblems,       
+                userStanding,
+                hasRow,
+                userSubmissions,
+                contestDataFromRating
+            );
+        } catch (error) {
+            console.error('获取比赛详情失败:', error);
+            this.renderContestDetailsModal(
+                contestName, contestId,
+                null, null, false,
+                userSubmissions, contestDataFromRating
+            );
+        }
+    }
+    
+    renderContestDetailsModal(contestName, contestId, apiProblems, userStanding, hasRow, userSubmissions, contestDataFromRating) {
+        let problemsList = [];
+        if (apiProblems && apiProblems.length > 0) {
+            problemsList = apiProblems.map(p => ({
+                index: p.index,
+                name: p.name,
+                points: p.points || 0,
+                rating: p.rating || 0
+            }));
+        } else if (contestDataFromRating && contestDataFromRating.problemResults) {
+            const cnt = contestDataFromRating.problemResults.length;
+            for (let i = 0; i < cnt; i++) {
+                const idx = String.fromCharCode(65 + i);
+                problemsList.push({
+                    index: idx,
+                    name: `Problem ${idx}`,
+                    points: 0
+                });
+            }
+        }
+        if (problemsList.length === 0) {
+            problemsList = [{ index: '?', name: '无法获取题目列表', points: 0 }];
+        }
+        
+        const contestSubmissions = userSubmissions.filter(sub => 
+            sub.problem && sub.problem.contestId === contestId
+        );
+        
+        const subMap = new Map();
+        contestSubmissions.forEach(sub => {
+            const idx = sub.problem.index;
+            const isOk = sub.verdict === 'OK';
+            const time = sub.creationTimeSeconds || 0;
+            if (!subMap.has(idx)) {
+                subMap.set(idx, { ok: isOk, attempts: 1, bestTime: isOk ? time : 0 });
+            } else {
+                const cur = subMap.get(idx);
+                cur.attempts++;
+                if (isOk && (!cur.ok || time < cur.bestTime)) {
+                    cur.ok = true;
+                    cur.bestTime = time;
+                }
+            }
+        });
+        
+
+        const solvedInContest = new Set(); 
+        if (hasRow && userStanding && userStanding.problemResults) {
+            userStanding.problemResults.forEach((res, idx) => {
+                if (res.points > 0 && problemsList[idx]) {
+                    solvedInContest.add(problemsList[idx].index);
+                }
+            });
+        }
+        
+        let problemsHtml = '';
+        for (let i = 0; i < problemsList.length; i++) {
+            const prob = problemsList[i];
+            const idx = prob.index;
+            const sub = subMap.get(idx) || { ok: false, attempts: 0, bestTime: 0 };
+            const ok = sub.ok;
+            const attempts = sub.attempts;
+            const bestSec = sub.bestTime;
+            
+            // 判断状态
+            let statusIcon = '⚪';
+            let statusColor = '#666';
+            let statusText = '未尝试';
+            let extraClass = '';
+            let pointsDisplay = prob.points || '?';
+            
+            if (ok) {
+                const isContest = solvedInContest.has(idx);
+                if (isContest && hasRow) {
+                    const pointVal = (userStanding && userStanding.problemResults && userStanding.problemResults[i]) 
+                                   ? (userStanding.problemResults[i].points || 0) : 0;
+                    pointsDisplay = pointVal > 0 ? `${pointVal} 分` : '通过';
+                    statusIcon = '✅';
+                    statusColor = '#28a745';
+                    statusText = '比赛中通过';
+                    extraClass = '';
+                } else {
+                    // 补题通过
+                    pointsDisplay = '补题通过';
+                    statusIcon = '🔄';
+                    statusColor = '#ffc107';
+                    statusText = '补题通过';
+                    extraClass = 'problem-vp';
+                }
+            } else if (attempts > 0) {
+                statusIcon = '❌';
+                statusColor = '#dc3545';
+                statusText = '未通过';
+                extraClass = 'problem-unsolved';
+            }
+            
+            // 时间格式化
+            let timeStr = '';
+            if (ok && bestSec > 0) {
+                const mins = Math.floor(bestSec / 60);
+                const secs = bestSec % 60;
+                timeStr = ` (${mins}:${secs.toString().padStart(2, '0')})`;
+            }
+            
+            problemsHtml += `
+                <div style="padding: 12px; border-bottom: 1px solid #eee; display: flex; align-items: center; ${extraClass ? `background-color: ${extraClass === 'problem-vp' ? '#fff3cd' : '#f8d7da'};` : ''}">
+                    <div style="width: 40px; font-weight: bold; color: ${statusColor};">${statusIcon}</div>
+                    <div style="width: 60px; font-weight: bold;">${prob.index}</div>
+                    <div style="flex: 1;">${this.escapeHtml(prob.name)}</div>
+                    <div style="width: 100px; text-align: center;">${pointsDisplay}</div>
+                    <div style="width: 140px; text-align: center; color: ${statusColor};">
+                        ${!ok && attempts > 0 ? ` (尝试 ${attempts} 次)` : ''}
+                    </div>
+                </div>
+            `;
+        }
+        
+        let rank = '?';
+        let points = 0;
+        let penalty = 0;
+        let solvedTotal = 0;
+        if (hasRow && userStanding) {
+            rank = userStanding.rank;
+            points = userStanding.points || 0;
+            penalty = userStanding.penalty || 0;
+            solvedTotal = userStanding.problemResults.filter(r => r.points > 0).length;
+        } else if (contestDataFromRating) {
+            rank = contestDataFromRating.rank;
+
+        }
+
+        const solvedAfter = Array.from(subMap.entries())
+            .filter(([idx, sub]) => sub.ok && !solvedInContest.has(idx)).length;
+        const totalSolved = (hasRow ? solvedTotal : 0) + solvedAfter;
+        
+        // 数据来源提示
+        let sourceMsg = '';
+        if (hasRow) {
+            sourceMsg = `<div style="font-size: 12px; color: #28a745; margin-bottom: 10px;">✓ 数据来源：比赛排名 API（含详细排名）</div>`;
+        } else {
+            sourceMsg = `<div style="font-size: 12px; color: #ffc107; margin-bottom: 10px;">
+                <i class="fas fa-exclamation-triangle"></i> 数据来源：user.contest API（无详细排名）
+                <br><a href="https://codeforces.com/contest/${contestId}/standings" target="_blank" style="color: #007bff;">点击查看官方完整排名</a>
+            </div>`;
+        }
+        
+        const modalContent = `
+            <div style="max-height: 70vh; overflow-y: auto;">
+                ${sourceMsg}
+                <!-- 概要 -->
+                <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-around; text-align: center;">
+                        <div><div style="font-size:12px;color:#666;">排名</div><div style="font-size:24px;font-weight:bold;">#${rank}</div></div>
+                        <div><div style="font-size:12px;color:#666;">总分</div><div style="font-size:24px;font-weight:bold;">${points}</div></div>
+                        <div><div style="font-size:12px;color:#666;">解题数</div><div style="font-size:24px;font-weight:bold;">
+                            ${totalSolved}/${problemsList.length}
+                            ${solvedAfter > 0 ? `<span style="font-size:14px;color:#ffc107;"> (赛后补 ${solvedAfter})</span>` : ''}
+                        </div></div>
+                    </div>
+                </div>
+                <!-- 题目表 -->
+                <div style="border:1px solid #e0e0e0; border-radius:8px; overflow:hidden;">
+                    <div style="background:#f0f0f0; padding:12px; font-weight:bold; border-bottom:1px solid #e0e0e0;">
+                        📋 题目提交详情
+                    </div>
+                    ${problemsHtml}
+                </div>
+                <!-- 链接 -->
+                <div style="margin-top:20px; text-align:center;">
+                    <a href="https://codeforces.com/contest/${contestId}" target="_blank" 
+                       style="display:inline-block; padding:8px 20px; background:#007bff; color:white; text-decoration:none; border-radius:5px; margin-right:10px;">
+                        📊 比赛原站
+                    </a>
+                    <a href="https://codeforces.com/contest/${contestId}/standings" target="_blank" 
+                       style="display:inline-block; padding:8px 20px; background:#28a745; color:white; text-decoration:none; border-radius:5px; margin-right:10px;">
+                        🏆 完整排名
+                    </a>
+                    <button class="modal-close-btn" style="padding:8px 20px; background:#6c757d; color:white; border:none; border-radius:5px; cursor:pointer;">关闭</button>
+                </div>
+            </div>
+        `;
+        
+        this.showModal(modalContent, `${contestName} - 详细数据`);
+    }
+    
+    showModal(content, title) {
+        this.closeModal();
+        const modal = document.createElement('div');
+        modal.id = this.modalId;
+        modal.style.cssText = `position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center; z-index:10000; backdrop-filter:blur(3px);`;
+        const modalContent = document.createElement('div');
+        modalContent.style.cssText = `background:white; border-radius:12px; padding:24px; max-width:800px; width:90%; max-height:85vh; overflow-y:auto; box-shadow:0 4px 20px rgba(0,0,0,0.3);`;
+        modalContent.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:2px solid #e0e0e0; padding-bottom:12px;">
+            <h3 style="margin:0; font-size:20px;">${this.escapeHtml(title)}</h3>
+            <button class="modal-close-btn" style="background:none; border:none; font-size:24px; cursor:pointer; color:#666;">&times;</button>
+        </div>${content}`;
+        modal.appendChild(modalContent);
+        document.body.appendChild(modal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) this.closeModal(); });
+        const closeBtn = modal.querySelector('.modal-close-btn');
+        if (closeBtn) closeBtn.onclick = () => this.closeModal();
+    }
+    
+    closeModal() {
+        const existing = document.getElementById(this.modalId);
+        if (existing) existing.remove();
+    }
+}
 
 (async function () {
     "use strict";
@@ -146,6 +452,7 @@ class Person {
     //console.log('比赛数据:', u.userContests);
 
     // 全局状态
+    const contestDetailManager = new ContestDetailManager();
     let users = u.userContests?.result || [];
     let currentUser = users.length > 0 ? users[0] : null;
     let currentContests = [];
@@ -161,6 +468,15 @@ class Person {
     // 后续比赛数据
     let UPCOMING_CONTESTS = [];
 
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
     // 辅助: 等级颜色
     function getRatingColorClass(r) {
         if (r < 1200) return 'rating-newbie';
@@ -308,6 +624,7 @@ class Person {
 
     // 获取后续比赛数据
     function fetchUpcomingContests() {
+        //console.log('获取后续比赛数据...');
         fetch('https://codeforces.com/api/contest.list')
             .then(response => {
                 if (!response.ok) {
@@ -390,7 +707,11 @@ class Person {
                 const changeSign = ratingChange > 0 ? '+' : '';
                 
                 html += `
-                    <div class="contest-card">
+                    <div class="contest-card" 
+                        data-contest-id="${c.contestId}" 
+                        data-contest-name="${escapeHtml(c.contestName)}"
+                        data-contest-rank="${c.rank}"
+                        style="cursor: pointer;">
                         <div class="contest-header">
                             <div class="contest-name">${c.contestName}</div>
                             <div class="contest-date">📅 ${contestDate}</div>
@@ -414,6 +735,7 @@ class Person {
         html += '</div>';
         contestsWrapper.innerHTML = html;
     }
+
     
     // 渲染已通过题目
     function renderSolvedProblems() {
@@ -602,9 +924,33 @@ class Person {
             return;
         }
         
+        // 获取当前时间戳（秒）
+        const now = Math.floor(Date.now() / 1000);
+        let cutoffTime = 0;
+        
+        // 根据选择的 range 设置截止时间
+        switch (range) {
+            case 'year':
+                cutoffTime = now - 365 * 24 * 3600;
+                break;
+            case '180d':
+                cutoffTime = now - 180 * 24 * 3600;
+                break;
+            case 'month':
+                cutoffTime = now - 30 * 24 * 3600;
+                break;
+            default:
+                cutoffTime = 0;
+        }
+        
+        // 收集通过的题目（按时间筛选）
         const uniqueProblems = new Map();
         currentSubmissions.forEach(s => {
             if (s && s.verdict === 'OK' && s.problem) {
+                if (cutoffTime > 0 && (!s.creationTimeSeconds || s.creationTimeSeconds < cutoffTime)) {
+                    return;
+                }
+                
                 const key = `${s.problem.contestId}|${s.problem.index}`;
                 if (!uniqueProblems.has(key)) {
                     uniqueProblems.set(key, s.problem.rating || 0);
@@ -612,10 +958,18 @@ class Person {
             }
         });
         
+        if (uniqueProblems.size === 0) {
+            chartHistogram.setOption({ 
+                title: { text: '该时间段内无通过题目', left: 'center', top: 'center' } 
+            });
+            return;
+        }
+        
         const ratings = Array.from(uniqueProblems.values());
         const withRating = ratings.filter(r => r > 0);
         const withoutRating = ratings.filter(r => r === 0);
         
+        // 难度分桶
         const buckets = { '无评级': withoutRating.length };
         const ranges = ['800-1199', '1200-1399', '1400-1599', '1600-1899', '1900-2099', '2100-2399', '2400+'];
         ranges.forEach(r => buckets[r] = 0);
@@ -630,8 +984,27 @@ class Person {
             else buckets['2400+']++;
         });
         
+        // 计算总题目数
+        const totalProblems = Object.values(buckets).reduce((a, b) => a + b, 0);
+        
+        // 生成标题（带上总题目数）
+        let titleText = `通过题目难度分布 (共 ${totalProblems} 题)`;
+        switch (range) {
+            case 'year':
+                titleText = `通过题目难度分布 - 近一年 (共 ${totalProblems} 题)`;
+                break;
+            case '180d':
+                titleText = `通过题目难度分布 - 近180天 (共 ${totalProblems} 题)`;
+                break;
+            case 'month':
+                titleText = `通过题目难度分布 - 近1个月 (共 ${totalProblems} 题)`;
+                break;
+            default:
+                titleText = `通过题目难度分布 - 全部 (共 ${totalProblems} 题)`;
+        }
+        
         chartHistogram.setOption({
-            title: { text: `通过题目分布`, left: 'center' },
+            title: { text: titleText, left: 'center' },
             tooltip: { trigger: 'axis' },
             xAxis: { data: Object.keys(buckets), axisLabel: { rotate: 45 } },
             yAxis: { name: '题目数量' },
@@ -639,11 +1012,15 @@ class Person {
                 type: 'bar',
                 data: Object.values(buckets),
                 itemStyle: { color: (p) => p.dataIndex === 0 ? '#f59e0b' : '#3b82f6' },
-                label: { show: true, position: 'top' }
+                label: { 
+                    show: true, 
+                    position: 'top',
+                    formatter: (params) => params.value > 0 ? params.value : ''
+                }
             }]
         });
     }
-    
+        
     // Rating 曲线
     function renderRatingCurve() {
         const dom = document.getElementById('rating-curve-chart');
@@ -747,7 +1124,7 @@ class Person {
                 currentContests = [];
             });
     }
-    
+
     // 全局更新函数
     function updateAllUI() {
         renderContestsTable();
@@ -759,7 +1136,7 @@ class Person {
         renderHistogram('all');
         renderRatingCurve();
         renderUpcoming();
-        
+        renderContestsTable();
         document.querySelectorAll('.filter-btn').forEach(b => b.addEventListener('click', () => {
             document.querySelectorAll('.filter-btn').forEach(bb => bb.classList.remove('active'));
             b.classList.add('active');
@@ -767,6 +1144,28 @@ class Person {
         }));
     }
 
+    // 绑定比赛卡片点击事件
+    contestsWrapper.addEventListener('click', (e) => {
+        const card = e.target.closest('.contest-card');
+        if (!card) return;
+        
+        const contestId = card.dataset.contestId;
+        const contestName = card.dataset.contestName;
+        
+        if (contestId && contestName && currentUser && currentUser.handle) {
+            // 找到对应的比赛数据（来自 rating API）
+            const contestData = currentContests.find(c => c.contestId === parseInt(contestId));
+            
+            contestDetailManager.showContestDetails(
+                parseInt(contestId), 
+                contestName, 
+                currentUser.handle,
+                contestData,      // 传入比赛数据（来自 user.rating）
+                currentSubmissions // 传入用户提交记录（用于判断补题）
+            );
+        }
+    });
+        
     // 事件绑定
     const refreshBtn = document.getElementById('refreshBtn');
     const addMemberBtn = document.getElementById('addMemberBtn');
